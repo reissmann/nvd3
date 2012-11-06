@@ -6,33 +6,33 @@ nv.models.scatter = function() {
   //------------------------------------------------------------
 
   var margin      = {top: 0, right: 0, bottom: 0, left: 0}
-   ,  width       = 960
-   ,  height      = 500
-   ,  color       = nv.utils.defaultColor() // chooses color
-   ,  id          = Math.floor(Math.random() * 100000) //Create semi-unique ID incase user doesn't selet one
-   ,  x           = d3.scale.linear()
-   ,  y           = d3.scale.linear()
-   ,  z           = d3.scale.linear() //linear because d3.svg.shape.size is treated as area
-   ,  getX        = function(d) { return d.x } // accessor to get the x value
-   ,  getY        = function(d) { return d.y } // accessor to get the y value
-   ,  getSize     = function(d) { return d.size } // accessor to get the point size
-   ,  getShape    = function(d) { return d.shape || 'circle' } // accessor to get point shape
-   ,  forceX      = [] // List of numbers to Force into the X scale (ie. 0, or a max / min, etc.)
-   ,  forceY      = [] // List of numbers to Force into the Y scale
-   ,  forceSize   = [] // List of numbers to Force into the Size scale
-   ,  interactive = true // If true, plots a voronoi overlay for advanced point interection
-   ,  pointActive = function(d) { return !d.notActive } // any points that return false will be filtered out
-   ,  clipEdge    = false // if true, masks points within x and y scale
-   ,  clipVoronoi = true // if true, masks each point with a circle... can turn off to slightly increase performance
-   ,  clipRadius  = function() { return 25 } // function to get the radius for voronoi point clips
-   ,  xDomain     = null // Override x domain (skips the calculation from data)
-   ,  yDomain     = null // Override y domain
-   ,  sizeDomain  = null // Override point size domain
-   ,  sizeRange   = null
-   ,  singlePoint = false
-   ,  dispatch    = d3.dispatch('elementClick', 'elementMouseover', 'elementMouseout')
-   ,  useVoronoi  = true
-   ;
+    , width       = 960
+    , height      = 500
+    , color       = nv.utils.defaultColor() // chooses color
+    , id          = Math.floor(Math.random() * 100000) //Create semi-unique ID incase user doesn't selet one
+    , x           = d3.scale.linear()
+    , y           = d3.scale.linear()
+    , z           = d3.scale.linear() //linear because d3.svg.shape.size is treated as area
+    , getX        = function(d) { return d.x } // accessor to get the x value
+    , getY        = function(d) { return d.y } // accessor to get the y value
+    , getSize     = function(d) { return d.size || 1} // accessor to get the point size
+    , getShape    = function(d) { return d.shape || 'circle' } // accessor to get point shape
+    , forceX      = [] // List of numbers to Force into the X scale (ie. 0, or a max / min, etc.)
+    , forceY      = [] // List of numbers to Force into the Y scale
+    , forceSize   = [] // List of numbers to Force into the Size scale
+    , interactive = true // If true, plots a voronoi overlay for advanced point interection
+    , pointActive = function(d) { return !d.notActive } // any points that return false will be filtered out
+    , clipEdge    = false // if true, masks points within x and y scale
+    , clipVoronoi = true // if true, masks each point with a circle... can turn off to slightly increase performance
+    , clipRadius  = function() { return 25 } // function to get the radius for voronoi point clips
+    , xDomain     = null // Override x domain (skips the calculation from data)
+    , yDomain     = null // Override y domain
+    , sizeDomain  = null // Override point size domain
+    , sizeRange   = null
+    , singlePoint = false
+    , dispatch    = d3.dispatch('elementClick', 'elementMouseover', 'elementMouseout')
+    , useVoronoi  = true
+    ;
 
   //============================================================
 
@@ -141,11 +141,13 @@ nv.models.scatter = function() {
 
         var vertices = d3.merge(data.map(function(group, groupIndex) {
             return group.values
-              .filter(pointActive) // remove non-interactive points
               .map(function(point, pointIndex) {
                 // *Adding noise to make duplicates very unlikely
                 // **Injecting series and point index for reference
-                return [x(getX(point,pointIndex)) * (Math.random() / 1e12 + 1)  , y(getY(point,pointIndex)) * (Math.random() / 1e12 + 1), groupIndex, pointIndex]; //temp hack to add noise untill I think of a better way so there are no duplicates
+                return [x(getX(point,pointIndex)) * (Math.random() / 1e12 + 1)  , y(getY(point,pointIndex)) * (Math.random() / 1e12 + 1), groupIndex, pointIndex, point]; //temp hack to add noise untill I think of a better way so there are no duplicates
+              })
+              .filter(function(pointArray, pointIndex) {
+                return pointActive(pointArray[4], pointIndex); // Issue #237.. move filter to after map, so pointIndex is correct!
               })
           })
         );
@@ -170,6 +172,9 @@ nv.models.scatter = function() {
 
         //inject series and point index for reference into voronoi
         if (useVoronoi === true) {
+          // Issue #283 - Adding 2 dummy points to the voronoi b/c voronoi requires min 3 points to work
+          vertices.push([x.range()[0] - 20, y.range()[0] - 20, null, null]);
+          vertices.push([x.range()[1] + 20, y.range()[1] + 20, null, null]);
           var voronoi = d3.geom.voronoi(vertices).map(function(d, i) {
               return {
                 'data': d,
@@ -355,7 +360,10 @@ nv.models.scatter = function() {
 
   chart.margin = function(_) {
     if (!arguments.length) return margin;
-    margin = _;
+    margin.top    = typeof _.top    != 'undefined' ? _.top    : margin.top;
+    margin.right  = typeof _.right  != 'undefined' ? _.right  : margin.right;
+    margin.bottom = typeof _.bottom != 'undefined' ? _.bottom : margin.bottom;
+    margin.left   = typeof _.left   != 'undefined' ? _.left   : margin.left;
     return chart;
   };
 
